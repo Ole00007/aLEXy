@@ -11,7 +11,7 @@ notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notific
 @jwt_required()
 def list_notifications():
     """List current user's notifications, newest first. Paginated."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
 
@@ -30,7 +30,7 @@ def list_notifications():
 @jwt_required()
 def unread_count():
     """Return the count of unread notifications for the current user."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     count = Notification.get_unread_count(user_id)
     return jsonify({'count': count}), 200
 
@@ -39,7 +39,7 @@ def unread_count():
 @jwt_required()
 def mark_read(notif_id):
     """Mark a single notification as read. Must belong to the current user."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     notif = Notification.query.get(notif_id)
 
     if not notif:
@@ -56,7 +56,7 @@ def mark_read(notif_id):
 @jwt_required()
 def mark_all_read():
     """Mark all of the current user's unread notifications as read."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     updated = Notification.mark_all_read(user_id)
     db.session.commit()
     return jsonify({'updated': updated}), 200
