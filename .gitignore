@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+*.egg-info
+
+# Virtual environments
+.venv/
+.venv.local/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Instance
+instance/
+
+# Uploads (keep structure, not content)
+uploads/*
+!uploads/.gitkeep
+
+# Backups
+backups/
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Railway logs
+.railway/
