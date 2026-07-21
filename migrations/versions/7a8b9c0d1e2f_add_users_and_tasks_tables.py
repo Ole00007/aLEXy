@@ -39,7 +39,6 @@ def upgrade():
         sa.Column('duedate', sa.Date(), nullable=True),
         sa.Column('createdat', sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.Column('updatedat', sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(['caseid'], ['cases.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['userid'], ['users.id'], ondelete='SET NULL'),
         sa.PrimaryKeyConstraint('id')
     )

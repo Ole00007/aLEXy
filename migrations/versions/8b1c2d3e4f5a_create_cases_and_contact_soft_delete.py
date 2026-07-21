@@ -37,9 +37,13 @@ def upgrade():
         sa.ForeignKeyConstraint(['assignedto'], ['users.id'], name=op.f('cases_assignedto_fkey'), ondelete='SET NULL'),
         sa.PrimaryKeyConstraint('id')
     )
+    
+    # Add FK from tasks.caseid to cases.id (cases table just created above)
+    op.create_foreign_key('tasks_caseid_fkey', 'tasks', 'cases', ['caseid'], ['id'], ondelete='CASCADE')
 
 
 def downgrade():
+    op.drop_constraint('tasks_caseid_fkey', 'tasks', type_='foreignkey')
     op.drop_table('cases')
     op.drop_column('contacts', 'deleted_at')
     op.drop_column('contacts', 'is_deleted')
