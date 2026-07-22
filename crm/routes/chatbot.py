@@ -69,6 +69,6 @@ def chat():
     elif category == "default":
         reply = random.choice(list(INTAKE_PROMPTS.values()))
     else:
-        reply = random.choice(INTAKE_PROMPTS.get(category, [INTAKE_PROMPTS["default"]]))
+        reply = INTAKE_PROMPTS.get(category, INTAKE_PROMPTS["default"])
     
     return jsonify({"reply": reply})
