@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Matter #{{ matter["id"] }} – LexFlow{% endblock %}
+{% block title %}Matter #{{ matter["id"] }} – aLEXy{% endblock %}
 
 {% block content %}
 <section class="card stack" aria-labelledby="page-title">
@@ -51,57 +51,44 @@
                     {% endfor %}
                 </select>
             </p>
-
             <p>
                 <label for="internal_notes">Internal notes</label>
                 <textarea id="internal_notes" name="internal_notes" rows="4">{{ matter["internal_notes"] or "" }}</textarea>
                 <small>For staff only. These notes are never shown on the public client status page.</small>
             </p>
-
-            <p>
-                <label for="event_note">Timeline note</label>
-                <textarea id="event_note" name="event_note" rows="4" placeholder="Client-visible update note…"></textarea>
-                <small>If left blank, LexFlow adds a simple default status update.</small>
-            </p>
-
             <div class="actions">
-                <button class="button" type="submit">Save update</button>
+                <button type="submit" class="button">Update matter</button>
             </div>
         </form>
     </section>
 
-    <section class="section" aria-labelledby="matter-documents">
-        <h2 id="matter-documents">Documents received</h2>
-        {% if docs %}
-            <ul>
-                {% for doc in docs %}
-                    <li>
-                        <a href="/uploads/{{ doc.stored_name }}" target="_blank" rel="noopener">
-                            {{ doc.original_name }}
-                        </a>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>No documents uploaded yet.</p>
-        {% endif %}
+    {% if events %}
+    <section class="section" aria-labelledby="matter-events">
+        <h2 id="matter-events">Event log</h2>
+        <ul class="timeline">
+            {% for event in events %}
+                <li>
+                    <p><span class="badge">{{ event["status"] }}</span></p>
+                    <p>{{ event["note"] or "Status updated." }}</p>
+                    <p style="margin-bottom:0;color:var(--text-muted)">{{ event["event_time"] }}</p>
+                </li>
+            {% endfor %}
+        </ul>
     </section>
+    {% endif %}
 
-    <section class="section" aria-labelledby="matter-timeline">
-        <h2 id="matter-timeline">Timeline</h2>
-        {% if events %}
-            <ul class="timeline">
-                {% for event in events %}
-                    <li>
-                        <p><span class="badge">{{ event["status"] }}</span></p>
-                        <p>{{ event["note"] }}</p>
-                        <p style="margin-bottom: 0; color: var(--muted);">{{ event["event_time"] }}</p>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>No timeline events yet.</p>
-        {% endif %}
+    {% if docs %}
+    <section class="section" aria-labelledby="matter-docs">
+        <h2 id="matter-docs">Documents</h2>
+        <ul class="timeline">
+            {% for doc in docs %}
+                <li>
+                    <p><strong>{{ doc["original_name"] }}</strong></p>
+                    <p style="margin-bottom:0;color:var(--text-muted)">Uploaded {{ doc["uploaded_at"] }}</p>
+                </li>
+            {% endfor %}
+        </ul>
     </section>
+    {% endif %}
 </section>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Admin – LexFlow{% endblock %}
+{% block title %}Admin – aLEXy{% endblock %}
 
 {% block content %}
 <section class="card stack" aria-labelledby="page-title">
@@ -12,7 +12,7 @@
         </p>
         <div class="actions">
             <a class="button" href="{{ url_for('index') }}">New intake</a>
-            <form method="POST" action="{{ url_for('load_demo') }}" style="display:inline"><button type="submit" class="button button-secon
+            <form method="POST" action="{{ url_for('load_demo') }}" style="display:inline"><button type="submit" class="button button-secondary">Load demo data</button></form>
         </div>
     </div>
 
