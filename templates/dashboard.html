@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — aLEXy{% endblock %}
+
+{% block content %}
+<section class="card stack" aria-labelledby="page-title">
+    <div class="section">
+        <p class="eyebrow">Welcome to aLEXy</p>
+        <h1 id="page-title">Dashboard</h1>
+        <p class="intro">
+            Legal intake and case management workspace. Track matters, manage tasks, and stay on top of your workflow.
+        </p>
+    </div>
+
+    <div class="grid" id="stats-grid">
+        <div class="feature" style="background:linear-gradient(135deg,rgba(59,125,216,0.15),transparent 60%),var(--surface-2)">
+            <h3>Contacts</h3>
+            <p style="font-size:var(--text-3xl);font-weight:700;color:var(--accent-h);margin:0" id="stat-contacts">—</p>
+        </div>
+        <div class="feature">
+            <h3>Cases</h3>
+            <p style="font-size:var(--text-3xl);font-weight:700;color:var(--accent-h);margin:0" id="stat-cases">—</p>
+        </div>
+        <div class="feature">
+            <h3>Tasks</h3>
+            <p style="font-size:var(--text-3xl);font-weight:700;color:var(--accent-h);margin:0" id="stat-tasks">—</p>
+        </div>
+        <div class="feature">
+            <h3>Pending</h3>
+            <p style="font-size:var(--text-3xl);font-weight:700;color:var(--warning);margin:0" id="stat-pending">—</p>
+        </div>
+    </div>
+
+    <div class="feature-grid">
+        <div class="feature">
+            <h3>Quick actions</h3>
+            <div class="actions" style="margin-top:var(--space-4)">
+                <a class="button" href="{{ url_for('kanban.kanban') }}">Kanban board</a>
+                <a class="button button-secondary" href="{{ url_for('kanban.kanban') }}?open=add">Add task</a>
+            </div>
+            <p style="margin-top:var(--space-4);color:var(--text-muted);font-size:var(--text-sm)">
+                Use the sidebar to navigate between sections. The kanban board gives you a full task management view.
+            </p>
+        </div>
+        <div class="feature">
+            <h3>Recent activity</h3>
+            <ul class="timeline" id="recent-tasks" style="margin-top:var(--space-3)">
+                <li style="color:var(--text-muted);font-size:var(--text-sm)">Loading...</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<script>
+(function() {
+    var t = localStorage.getItem('jwt');
+    if (!t) return;
+
+    function fetchJSON(url) {
+        return fetch(url, {headers: {'Authorization': 'Bearer ' + t}}).then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        });
+    }
+
+    // Stats
+    Promise.all([
+        fetchJSON('/api/contacts/'),
+        fetchJSON('/api/cases'),
+        fetchJSON('/api/tasks/'),
+        fetchJSON('/api/tasks/?status=pending&per_page=1')
+    ]).then(function(results) {
+        var contacts = Array.isArray(results[0]) ? results[0] : [];
+        var cases = results[1].total || (results[1].items ? results[1].items.length : 0);
+        var tasks = results[2].total || 0;
+        var pending = results[3].total || 0;
+
+        document.getElementById('stat-contacts').textContent = contacts.length;
+        document.getElementById('stat-cases').textContent = cases;
+        document.getElementById('stat-tasks').textContent = tasks;
+        document.getElementById('stat-pending').textContent = pending;
+    }).catch(function(e) {
+        console.error('Stats load failed:', e);
+    });
+
+    // Recent tasks
+    fetchJSON('/api/tasks/?per_page=5')
+        .then(function(d) {
+            var items = d.items || [];
+            var list = document.getElementById('recent-tasks');
+            if (!items.length) {
+                list.innerHTML = '<li style="color:var(--text-muted);font-size:var(--text-sm)">No tasks yet</li>';
+                return;
+            }
+            list.innerHTML = items.map(function(t) {
+                var statusIcon = t.status === 'completed' ? '✅' : t.status === 'in_progress' ? '🔄' : '📋';
+                return '<li>' + statusIcon + ' <strong>' + (t.title || 'Untitled') + '</strong> ' +
+                    '<span style="color:var(--text-muted)">— ' + (t.status || '').replace('_', ' ') + '</span></li>';
+            }).join('');
+        })
+        .catch(function(e) {
+            document.getElementById('recent-tasks').innerHTML = '<li style="color:var(--text-muted)">Could not load activity</li>';
+        });
+})();
+</script>
+{% endblock %}

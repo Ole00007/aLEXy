@@ -34,11 +34,11 @@ def create_app():
     app.register_blueprint(calendar_bp)
     app.register_blueprint(webhooks_bp)
 
-    # Root route → serves the kanban board
+    # Root route → serves the dashboard
     from flask import render_template
     @app.route("/")
     def root():
-        return render_template("kanban.html")
+        return render_template("dashboard.html")
 
     @app.errorhandler(400)
     def bad_request(error):
