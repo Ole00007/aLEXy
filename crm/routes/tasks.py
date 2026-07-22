@@ -14,6 +14,7 @@ from ..services.notifications import (
     notify_task_updated,
     notify_task_deleted,
 )
+from ..services import webhook
 
 tasks_bp = Blueprint('tasks', __name__, url_prefix='/api/tasks')
 
@@ -113,9 +114,13 @@ def create_task():
     
     db.session.add(task)
     db.session.commit()
-    
-    
-    
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("task.created", task.to_dict())
+    except Exception:
+        pass
+
     # In-app notifications (conditional on what changed)
     try:
         actor = get_jwt_identity()
@@ -125,7 +130,7 @@ def create_task():
             notify_task_updated(task, actor_id=actor, fields_changed=list(data.keys()))
     except Exception:
         pass
-    
+
     return jsonify(task.to_dict()), 200
 
 
@@ -146,9 +151,13 @@ def complete_task(task_id):
         task.actual_duration_minutes = data['actual_duration_minutes']
     
     db.session.commit()
-    
-    
-    
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("task.updated", task.to_dict())
+    except Exception:
+        pass
+
     # In-app notification
     try:
         notify_task_completed(task, actor_id=get_jwt_identity())
@@ -177,8 +186,13 @@ def delete_task(task_id):
     
     db.session.delete(task)
     db.session.commit()
-    
-    
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("task.deleted", {"task_id": task.id, "title": task.title})
+    except Exception:
+        pass
+
     # In-app notification to the previously-assigned user
     if assigned_to_before_delete and assigned_to_before_delete != actor_id:
         try:
@@ -432,7 +446,16 @@ def bulk_update_tasks():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
-    
+
+    # Fire webhook events for updated tasks
+    try:
+        for task_id in task_ids:
+            t = Task.query.get(task_id)
+            if t:
+                webhook.trigger_webhook("task.updated", t.to_dict())
+    except Exception:
+        pass
+
     return jsonify({'updated': updated, 'failed': len(errors), 'errors': errors}), 200
 
 
@@ -479,7 +502,16 @@ def bulk_complete_tasks():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
-    
+
+    # Fire webhook events for completed tasks
+    try:
+        for task_id in task_ids:
+            t = Task.query.get(task_id)
+            if t:
+                webhook.trigger_webhook("task.updated", t.to_dict())
+    except Exception:
+        pass
+
     return jsonify({'completed': completed, 'failed': len(errors), 'errors': errors}), 200
 
 
@@ -516,5 +548,12 @@ def bulk_delete_tasks():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
-    
+
+    # Fire webhook events for deleted tasks
+    try:
+        for task_id in task_ids:
+            webhook.trigger_webhook("task.deleted", {"task_id": task_id})
+    except Exception:
+        pass
+
     return jsonify({'deleted': deleted, 'failed': len(errors), 'errors': errors}), 200

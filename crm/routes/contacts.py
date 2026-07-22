@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from ..extensions import db
 from ..models.contact import Contact
 from datetime import datetime
+from ..services import webhook
 
 contacts_bp = Blueprint('contacts', __name__)
 
@@ -29,6 +30,13 @@ def create_contact():
     )
     db.session.add(contact)
     db.session.commit()
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("contact.created", contact.to_dict())
+    except Exception:
+        pass
+
     return jsonify(contact.to_dict()), 201
 
 @contacts_bp.delete('/contacts/<int:contact_id>')
@@ -42,4 +50,11 @@ def delete_contact(contact_id):
     contact.is_deleted = True
     contact.deleted_at = datetime.utcnow()
     db.session.commit()
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("contact.deleted", contact.to_dict())
+    except Exception:
+        pass
+
     return jsonify({'deleted': True}), 200

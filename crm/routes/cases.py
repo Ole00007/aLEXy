@@ -4,6 +4,7 @@ from ..extensions import db
 from ..models.case import Case
 from ..models.contact import Contact
 from ..models.user import User
+from ..services import webhook
 from datetime import date, datetime
 
 cases_bp = Blueprint("cases", __name__, url_prefix="/api")
@@ -94,6 +95,13 @@ def create_case():
     )
     db.session.add(case)
     db.session.commit()
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("case.created", case.to_dict())
+    except Exception:
+        pass
+
     return jsonify(case.to_dict()), 201
 
 
