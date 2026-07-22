@@ -3,7 +3,6 @@
 import os
 from crm import create_app
 from crm.extensions import db
-from crm.models.webhook import WebhookSubscription, WebhookDelivery
 
 # Force rebuild marker
 BUILD_VERSION = "20260720_v2"
@@ -13,48 +12,43 @@ app = create_app()
 def ensure_webhook_tables():
     """Ensure webhook tables exist (migration may not auto-run on Railway)."""
     try:
-        # Check if webhook_subscriptions table exists
         from sqlalchemy import text
         result = db.session.execute(text(
             "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'webhook_subscriptions')"
         )).scalar()
         if not result:
             print("Creating webhook tables (migration missing from Railway)...")
-            # Create tables manually
-            from sqlalchemy import MetaData, Table, Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, func, text
-            metadata = MetaData()
-            
-            # webhook_subscriptions
-            Table('webhook_subscriptions', metadata,
-                Column('id', Integer, primary_key=True),
-                Column('name', String(255), nullable=False),
-                Column('url', String(500), nullable=False),
-                Column('events', JSON, nullable=False),
-                Column('secret', String(64), nullable=False),
-                Column('active', Boolean, nullable=False, default=True),
-                Column('created_by', Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-                Column('created_at', DateTime, server_default=func.now(), nullable=False),
-                Column('updated_at', DateTime, server_default=func.now(), nullable=False),
-            )
-            
-            # webhook_deliveries
-            Table('webhook_deliveries', metadata,
-                Column('id', Integer, primary_key=True),
-                Column('subscription_id', Integer, ForeignKey('webhook_subscriptions.id', ondelete='CASCADE'), nullable=False),
-                Column('url', String(500), nullable=False),
-                Column('payload', JSON, nullable=False),
-                Column('status', String(20), nullable=False, server_default='pending'),
-                Column('http_status_code', Integer, nullable=True),
-                Column('retry_count', Integer, nullable=False, default=0),
-                Column('last_attempt_at', DateTime, nullable=True),
-                Column('error_message', Text, nullable=True),
-                Column('created_at', DateTime, server_default=func.now(), nullable=False),
-            )
-            
-            metadata.create_all(db.engine)
+            db.session.execute(text("""
+                CREATE TABLE webhook_subscriptions (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    url VARCHAR(500) NOT NULL,
+                    events JSON NOT NULL,
+                    secret VARCHAR(64) NOT NULL,
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            db.session.execute(text("""
+                CREATE TABLE webhook_deliveries (
+                    id INTEGER PRIMARY KEY,
+                    subscription_id INTEGER NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE,
+                    url VARCHAR(500) NOT NULL,
+                    payload JSON NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    http_status_code INTEGER,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    last_attempt_at TIMESTAMP,
+                    error_message TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
             db.session.commit()
-            print("Webhook tables created successfully.")
+            print("Webhook tables created successfully via SQL.")
     except Exception as e:
+        db.session.rollback()
         print(f"Warning: Could not auto-create webhook tables: {e}")
 
 # Run migration check on startup
