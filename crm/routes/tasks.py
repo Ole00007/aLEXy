@@ -211,6 +211,80 @@ def delete_task(task_id):
     return jsonify({'message': 'Task deleted'}), 200
 
 
+@tasks_bp.patch('/<int:task_id>')
+@jwt_required()
+def update_task(task_id):
+    """Update task fields (status, priority, assigned_to, etc.).
+    Used by kanban drag-and-drop and inline editing.
+    """
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    data = request.get_json() or {}
+    changed = []
+
+    if 'status' in data:
+        s = data['status'].lower()
+        if s not in VALID_STATUSES:
+            return jsonify({'error': f'status must be one of {VALID_STATUSES}'}), 400
+        task.status = s
+        if s == 'completed':
+            task.completed_at = datetime.utcnow()
+        changed.append('status')
+
+    if 'priority' in data:
+        p = data['priority'].lower()
+        if p not in VALID_PRIORITIES:
+            return jsonify({'error': f'priority must be one of {VALID_PRIORITIES}'}), 400
+        task.priority = p
+        changed.append('priority')
+
+    if 'title' in data:
+        task.title = data['title']
+        changed.append('title')
+
+    if 'description' in data:
+        task.description = data['description']
+        changed.append('description')
+
+    if 'assigned_to' in data:
+        if data['assigned_to'] is not None:
+            u = User.query.get(data['assigned_to'])
+            if not u:
+                return jsonify({'error': 'assigned_to user not found'}), 404
+        task.assigned_to = data['assigned_to']
+        changed.append('assigned_to')
+
+    if 'duedate' in data:
+        task.duedate = data['duedate']
+        changed.append('duedate')
+
+    if 'caseid' in data:
+        c = Case.query.get(data['caseid'])
+        if not c:
+            return jsonify({'error': 'Case not found'}), 404
+        task.caseid = data['caseid']
+        changed.append('caseid')
+
+    db.session.commit()
+
+    # Fire webhook event
+    try:
+        webhook.trigger_webhook("task.updated", task.to_dict())
+    except Exception:
+        pass
+
+    # In-app notification
+    try:
+        from ..services.notifications import notify_task_updated
+        notify_task_updated(task, actor_id=get_jwt_identity(), fields_changed=changed)
+    except Exception:
+        pass
+
+    return jsonify(task.to_dict()), 200
+
+
 @tasks_bp.get('/export.csv')
 @jwt_required()
 def export_tasks_csv():
