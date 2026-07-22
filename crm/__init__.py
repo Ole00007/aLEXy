@@ -34,6 +34,12 @@ def create_app():
     app.register_blueprint(calendar_bp)
     app.register_blueprint(webhooks_bp)
 
+    # Root route → serves the kanban board
+    from flask import render_template
+    @app.route("/")
+    def root():
+        return render_template("kanban.html")
+
     @app.errorhandler(400)
     def bad_request(error):
         return jsonify({"error": "Bad request"}), 400
