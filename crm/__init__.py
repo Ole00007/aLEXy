@@ -1,9 +1,12 @@
 from flask import Flask, jsonify
+from pathlib import Path
 from .config import Config
 from .extensions import db, migrate, jwt
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__,
+                template_folder=str(Path(__file__).resolve().parent.parent / "templates"),
+                static_folder=str(Path(__file__).resolve().parent.parent / "static"))
     app.config.from_object(Config)
 
     db.init_app(app)
