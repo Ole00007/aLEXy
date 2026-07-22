@@ -17,6 +17,7 @@ def create_app():
     from .routes.tasks import tasks_bp
     from .routes.kanban import kanban_bp
     from .routes.notifications import notifications_bp
+    from .routes.chatbot import chatbot_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(contacts_bp)
@@ -25,6 +26,7 @@ def create_app():
     app.register_blueprint(tasks_bp)
     app.register_blueprint(kanban_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(chatbot_bp)
 
     @app.errorhandler(400)
     def bad_request(error):
