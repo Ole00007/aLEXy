@@ -48,16 +48,16 @@ def chat():
     
     # Determine intent category from message keywords
     category = "default"
-    keywords = {
-        "contract": ["contract", "agreement", "breach", "terms", "clause"],
-        "employment": ["employment", "job", "work", "employer", "layoff", "fired", "hr"],
-        "family": ["family", "divorce", "custody", "child", "marriage", "separation"],
-        "criminal": ["criminal", "arrest", "charge", "court", "police", "bail"],
-        "real_estate": ["real estate", "property", "landlord", "tenant", "mortgage", "rent", "home"],
-        "debt": ["debt", "collection", "loan", "bankruptcy", "creditor", "default"]
-    }
+    keywords = [
+        ("contract", ["contract", "agreement", "breach", "terms", "clause"]),
+        ("employment", ["employment", "job", "work", "employer", "layoff", "fired", "hr"]),
+        ("family", ["family", "divorce", "custody", "child", "marriage", "separation"]),
+        ("criminal", ["criminal", "arrest", "charge", "court", "police", "bail"]),
+        ("real_estate", ["real estate", "property", "landlord", "tenant", "mortgage", "rent", "home"]),
+        ("debt", ["debt", "collection", "loan", "bankruptcy", "creditor", "default"])
+    ]
     
-    for cat, words in keywords.items():
+    for cat, words in keywords:
         for word in words:
             if word in message:
                 category = cat
