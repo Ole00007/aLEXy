@@ -4,14 +4,14 @@ from ..models.contact import Contact
 from datetime import datetime
 from ..services import webhook
 
-contacts_bp = Blueprint('contacts', __name__)
+contacts_bp = Blueprint('contacts', __name__, url_prefix='/api/contacts')
 
-@contacts_bp.get('/contacts')
+@contacts_bp.get('/')
 def get_contacts():
     contacts = Contact.query.filter_by(is_deleted=False).order_by(Contact.id.desc()).all()
     return jsonify([c.to_dict() for c in contacts]), 200
 
-@contacts_bp.post('/contacts')
+@contacts_bp.post('/')
 def create_contact():
     data = request.get_json()
     if not data:
@@ -39,7 +39,7 @@ def create_contact():
 
     return jsonify(contact.to_dict()), 201
 
-@contacts_bp.delete('/contacts/<int:contact_id>')
+@contacts_bp.delete('/<int:contact_id>')
 def delete_contact(contact_id):
     contact = Contact.query.get(contact_id)
     if not contact:
