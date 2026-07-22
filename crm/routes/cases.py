@@ -7,7 +7,7 @@ from ..models.user import User
 from ..services import webhook
 from datetime import date, datetime
 
-cases_bp = Blueprint("cases", __name__, url_prefix="/api")
+cases_bp = Blueprint("cases", __name__, url_prefix="/api", strict_slashes=False)
 
 VALID_CASE_STATUSES = ["Intake", "Review", "Closed"]
 VALID_PRIORITIES = ['low', 'medium', 'high', 'urgent']

@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..extensions import db
 from ..models.notification import Notification
 
-notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
+notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications', strict_slashes=False)
 
 
 @notifications_bp.get('/')
