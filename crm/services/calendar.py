@@ -1,259 +1,170 @@
-"""Google Calendar integration module for syncing Task and Case deadlines.
+"""Calendar service for managing CalendarEvent records.
 
-Supports both real Google Calendar (via OAuth2) and mock mode for testing.
-Real credentials will be swapped in once founder provides OAuth client secret.
+Provides CRUD operations, overlap validation, and query helpers
+for the aLEXy legal CRM internal calendar.
 """
 
-import os
-import logging
-from datetime import datetime
-from typing import Dict, Optional, Any
+from datetime import date, datetime, timedelta
+from typing import List, Optional, Dict, Any
 
-logger = logging.getLogger(__name__)
-
-# Will be set to True once credentials are available
-CALENDAR_READY = False
-calendar_service = None
+from ..extensions import db
+from ..models.calendar import CalendarEvent
 
 
-def initialize_calendar_service():
-    """Initialize Google Calendar service with OAuth2 credentials.
-    
-    Expects GOOGLE_CLIENT_SECRET_PATH env var pointing to credentials JSON file.
-    Falls back to mock mode if credentials not available.
-    """
-    global CALENDAR_READY, calendar_service
-    
-    secret_path = os.environ.get('GOOGLE_CLIENT_SECRET_PATH')
-    
-    if not secret_path:
-        logger.warning("GOOGLE_CLIENT_SECRET_PATH not set. Using mock calendar mode.")
-        CALENDAR_READY = False
-        return False
-    
-    if not os.path.exists(secret_path):
-        logger.warning(f"Credentials file not found at {secret_path}. Using mock calendar mode.")
-        CALENDAR_READY = False
-        return False
-    
-    try:
-        from google.oauth2.service_account import Credentials
-        from googleapiclient.discovery import build
-        
-        scopes = ['https://www.googleapis.com/auth/calendar.events']
-        creds = Credentials.from_service_account_file(secret_path, scopes=scopes)
-        calendar_service = build('calendar', 'v3', credentials=creds)
-        CALENDAR_READY = True
-        logger.info("Google Calendar service initialized successfully")
-        return True
-    
-    except ImportError:
-        logger.warning("Google Calendar libraries not installed. Using mock mode.")
-        CALENDAR_READY = False
-        return False
-    
-    except Exception as e:
-        logger.error(f"Failed to initialize Google Calendar: {str(e)}. Using mock mode.")
-        CALENDAR_READY = False
-        return False
+def get_events(user_id: int, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    """Return events in the given date range for the specified user.
 
-
-def create_or_update_calendar_event(
-    title: str,
-    description: Optional[str],
-    due_date: Optional[datetime],
-    event_type: Optional[str] = None,
-    location: Optional[str] = None,
-    external_event_id: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create or update a Google Calendar event.
-    
     Args:
-        title: Event title
-        description: Event description
-        due_date: Event date/time
-        event_type: Type of event (e.g., 'task_due', 'case_deadline')
-        location: Event location
-        external_event_id: Existing Google event ID to update (if any)
-    
+        user_id: Owner of the events.
+        start_date: ISO date string (YYYY-MM-DD), inclusive.
+        end_date: ISO date string (YYYY-MM-DD), inclusive.
+
     Returns:
-        {
-            'success': bool,
-            'event_id': str or None,  # Google Calendar event ID
-            'error': str or None,
-            'mock': bool  # True if using mock mode
-        }
+        List of event dicts sorted by start_time.
     """
-    if not due_date:
-        return {
-            'success': False,
-            'event_id': None,
-            'error': 'due_date is required',
-            'mock': not CALENDAR_READY
-        }
-    
-    event_body = {
-        'summary': title,
-        'description': description or '',
-        'start': {
-            'dateTime': due_date.isoformat(),
-            'timeZone': 'UTC'
-        },
-        'end': {
-            'dateTime': due_date.isoformat(),
-            'timeZone': 'UTC'
-        }
-    }
-    
-    if location:
-        event_body['location'] = location
-    
-    if event_type:
-        if 'description' in event_body:
-            event_body['description'] += f"\n[Type: {event_type}]"
-    
-    # Mock mode: return success without actual Google Calendar call
-    if not CALENDAR_READY:
-        logger.debug(f"[MOCK] Calendar event: {title} on {due_date}")
-        return {
-            'success': True,
-            'event_id': f"mock_{hash(title + str(due_date)) % 1000000}",
-            'error': None,
-            'mock': True
-        }
-    
-    try:
-        if external_event_id:
-            # Update existing event
-            result = calendar_service.events().update(
-                calendarId='primary',
-                eventId=external_event_id,
-                body=event_body
-            ).execute()
-            logger.info(f"Updated calendar event: {result.get('id')}")
-        else:
-            # Create new event
-            result = calendar_service.events().insert(
-                calendarId='primary',
-                body=event_body
-            ).execute()
-            logger.info(f"Created calendar event: {result.get('id')}")
-        
-        return {
-            'success': True,
-            'event_id': result.get('id'),
-            'error': None,
-            'mock': False
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create/update calendar event: {str(e)}")
-        return {
-            'success': False,
-            'event_id': None,
-            'error': str(e),
-            'mock': False
-        }
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+    events = (
+        CalendarEvent.query
+        .filter_by(user_id=user_id, is_deleted=False)
+        .filter(CalendarEvent.start_time <= end_dt)
+        .filter(CalendarEvent.end_time >= start_dt)
+        .order_by(CalendarEvent.start_time)
+        .all()
+    )
+    return [e.to_dict() for e in events]
 
 
-def delete_calendar_event(external_event_id: str) -> Dict[str, Any]:
-    """Delete a Google Calendar event.
-    
+def create_event(user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new calendar event, validating overlap and required fields.
+
     Args:
-        external_event_id: Google Calendar event ID
-    
+        user_id: Owner of the new event.
+        data: Dict with title (required), start_time, end_time, event_type,
+              description, and/or related_task_id.
+
     Returns:
-        {'success': bool, 'error': str or None, 'mock': bool}
+        Created event dict.
+
+    Raises:
+        ValueError: On missing fields or overlapping time.
     """
-    if not external_event_id:
-        return {
-            'success': False,
-            'error': 'external_event_id is required',
-            'mock': not CALENDAR_READY
-        }
-    
-    # Mock mode
-    if not CALENDAR_READY:
-        logger.debug(f"[MOCK] Deleted calendar event: {external_event_id}")
-        return {
-            'success': True,
-            'error': None,
-            'mock': True
-        }
-    
-    try:
-        calendar_service.events().delete(
-            calendarId='primary',
-            eventId=external_event_id
-        ).execute()
-        logger.info(f"Deleted calendar event: {external_event_id}")
-        return {
-            'success': True,
-            'error': None,
-            'mock': False
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to delete calendar event: {str(e)}")
-        return {
-            'success': False,
-            'error': str(e),
-            'mock': False
-        }
+    if not data.get("title"):
+        raise ValueError("title is required")
+    if not data.get("start_time"):
+        raise ValueError("start_time is required")
+    if not data.get("end_time"):
+        raise ValueError("end_time is required")
+
+    # Validate overlap with existing events for this user
+    start_dt = datetime.fromisoformat(data["start_time"])
+    end_dt = datetime.fromisoformat(data["end_time"])
+    if _has_overlap(user_id, start_dt, end_dt):
+        raise ValueError("Event overlaps with an existing event")
+
+    event = CalendarEvent(
+        user_id=user_id,
+        title=data["title"],
+        description=data.get("description"),
+        start_time=start_dt,
+        end_time=end_dt,
+        event_type=data.get("event_type", "task"),
+        related_task_id=data.get("related_task_id"),
+    )
+    db.session.add(event)
+    db.session.commit()
+    return event.to_dict()
 
 
-def get_calendar_event(external_event_id: str) -> Dict[str, Any]:
-    """Fetch a Google Calendar event.
-    
+def update_event(event_id: int, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Partially update a calendar event owned by the given user.
+
     Args:
-        external_event_id: Google Calendar event ID
-    
+        event_id: ID of the event to update.
+        user_id: Owner of the event.
+        data: Dict of fields to update (any of: title, description, start_time,
+              end_time, event_type, related_task_id).
+
     Returns:
-        {
-            'success': bool,
-            'event': dict or None,
-            'error': str or None,
-            'mock': bool
-        }
+        Updated event dict.
+
+    Raises:
+        ValueError: If event not found, not owned by user, or overlaps remain.
     """
-    if not external_event_id:
-        return {
-            'success': False,
-            'event': None,
-            'error': 'external_event_id is required',
-            'mock': not CALENDAR_READY
-        }
-    
-    # Mock mode
-    if not CALENDAR_READY:
-        return {
-            'success': True,
-            'event': None,  # Mock doesn't have real data
-            'error': None,
-            'mock': True
-        }
-    
-    try:
-        event = calendar_service.events().get(
-            calendarId='primary',
-            eventId=external_event_id
-        ).execute()
-        return {
-            'success': True,
-            'event': event,
-            'error': None,
-            'mock': False
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to fetch calendar event: {str(e)}")
-        return {
-            'success': False,
-            'event': None,
-            'error': str(e),
-            'mock': False
-        }
+    event = CalendarEvent.query.filter_by(id=event_id, user_id=user_id, is_deleted=False).first()
+    if not event:
+        raise ValueError("Event not found or not owned by this user")
+
+    if "start_time" in data or "end_time" in data:
+        start_dt = datetime.fromisoformat(data.get("start_time", event.start_time.isoformat()))
+        end_dt = datetime.fromisoformat(data.get("end_time", event.end_time.isoformat()))
+        if _has_overlap(user_id, start_dt, end_dt, exclude_event_id=event.id):
+            raise ValueError("Event overlaps with an existing event")
+
+    for field, value in data.items():
+        if value is not None and hasattr(event, field):
+            setattr(event, field, value)
+
+    db.session.commit()
+    return event.to_dict()
 
 
-# Initialize on module load
-initialize_calendar_service()
+def delete_event(event_id: int, user_id: int) -> None:
+    """Soft-delete a calendar event owned by the given user.
+
+    Args:
+        event_id: ID of the event to delete.
+        user_id: Owner of the event.
+
+    Raises:
+        ValueError: If event not found or not owned by user.
+    """
+    event = CalendarEvent.query.filter_by(id=event_id, user_id=user_id, is_deleted=False).first()
+    if not event:
+        raise ValueError("Event not found or not owned by this user")
+    event.is_deleted = True
+    db.session.commit()
+
+
+def get_upcoming(user_id: int, days: int = 7) -> List[Dict[str, Any]]:
+    """Return upcoming events for the user in the next N days.
+
+    Args:
+        user_id: Owner of the events.
+        days: Number of days ahead to look. Defaults to 7.
+
+    Returns:
+        List of event dicts sorted by start_time.
+    """
+    now = datetime.utcnow()
+    until = now + timedelta(days=days)
+
+    events = (
+        CalendarEvent.query
+        .filter_by(user_id=user_id, is_deleted=False)
+        .filter(CalendarEvent.start_time.between(now, until))
+        .order_by(CalendarEvent.start_time)
+        .all()
+    )
+    return [e.to_dict() for e in events]
+
+
+# ── Internal helpers ─────────────────────────────────────────────────────────
+
+
+def _has_overlap(user_id: int, start_dt: datetime, end_dt: datetime,
+                 exclude_event_id: Optional[int] = None) -> bool:
+    """Check if a time range overlaps with any existing event for the user.
+
+    Two ranges [s1, e1) and [s2, e2) overlap iff s1 < e2 and s2 < e1.
+    """
+    query = (
+        CalendarEvent.query
+        .filter_by(user_id=user_id, is_deleted=False)
+        .filter(CalendarEvent.start_time < end_dt)
+        .filter(CalendarEvent.end_time > start_dt)
+    )
+    if exclude_event_id is not None:
+        query = query.filter(CalendarEvent.id != exclude_event_id)
+    return query.first() is not None
