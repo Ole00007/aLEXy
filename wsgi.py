@@ -51,9 +51,24 @@ def ensure_webhook_tables():
         db.session.rollback()
         print(f"Warning: Could not auto-create webhook tables: {e}")
 
+def ensure_intake_tables():
+    """Create intake tables (intake_matters, intake_documents, intake_events)
+    if they don't already exist. Uses create_all on only the intake models
+    so no existing CRM tables are touched.
+    """
+    from crm.models.intake import Matter, IntakeDocument, IntakeEvent
+    tables = [Matter.__table__, IntakeDocument.__table__, IntakeEvent.__table__]
+    for table in tables:
+        try:
+            table.create(db.engine, checkfirst=True)
+            print(f"Table {table.name} ready.")
+        except Exception as e:
+            print(f"Note: could not create {table.name}: {e}")
+
 # Run migration check on startup
 with app.app_context():
     ensure_webhook_tables()
+    ensure_intake_tables()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -11,8 +11,8 @@
             Review intake details, update the client-visible status, and manage received documents.
         </p>
         <div class="actions">
-            <a class="button button-secondary" href="{{ url_for('admin') }}">Back to admin list</a>
-            <a class="button" href="{{ url_for('status', token=matter['token']) }}" target="_blank" rel="noopener">Open client status</a>
+            <a class="button button-secondary" href="{{ url_for('intake.admin_list') }}">Back to admin list</a>
+                        <a class="button" href="{{ url_for('intake.check_status', token=matter['token']) }}" target="_blank" rel="noopener">Open client status</a>
         </div>
     </div>
 
@@ -30,8 +30,8 @@
             <p><strong>Created:</strong> {{ matter["created_at"] }}</p>
             <p>
                 <strong>Tracking link:</strong>
-                <a href="{{ url_for('status', token=matter['token']) }}" target="_blank" rel="noopener">
-                    /status/{{ matter["token"] }}
+                <a href="{{ url_for('intake.check_status', token=matter['token']) }}" target="_blank" rel="noopener">
+                                    /status/{{ matter["token"] }}
                 </a>
             </p>
         </div>
@@ -40,7 +40,7 @@
 
     <section class="section" aria-labelledby="matter-update">
         <h2 id="matter-update">Update matter</h2>
-        <form action="{{ url_for('admin_matter', matter_id=matter['id']) }}" method="post">
+        <form action="{{ url_for('intake.admin_matter', matter_id=matter['id']) }}" method="post">
             <p>
                 <label for="status">Client-visible status</label>
                 <select id="status" name="status">

@@ -24,6 +24,7 @@ def create_app():
     from .routes.email import email_bp
     from .routes.calendar import calendar_bp
     from .routes.webhooks import webhooks_bp
+    from .routes.intake import intake_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(contacts_bp)
@@ -36,6 +37,7 @@ def create_app():
     app.register_blueprint(email_bp)
     app.register_blueprint(calendar_bp)
     app.register_blueprint(webhooks_bp)
+    app.register_blueprint(intake_bp)
 
     # Root route → serves the dashboard
     from flask import render_template

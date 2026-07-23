@@ -11,8 +11,8 @@
             Review new requests, open matter details, update statuses, and prepare demo screenshots.
         </p>
         <div class="actions">
-            <a class="button" href="{{ url_for('index') }}">New intake</a>
-            <form method="POST" action="{{ url_for('load_demo') }}" style="display:inline"><button type="submit" class="button button-secondary">Load demo data</button></form>
+            <a class="button" href="{{ url_for('intake.intake_form') }}">New intake</a>
+                        <form method="POST" action="{{ url_for('intake.load_demo') }}" style="display:inline"><button type="submit" class="button button-secondary">Load demo data</button></form>
         </div>
     </div>
 
@@ -52,7 +52,7 @@
                             <td>{{ matter["urgency"] }}</td>
                             <td>{{ matter["created_at"] }}</td>
                             <td>
-                                <a href="{{ url_for('admin_matter', matter_id=matter['id']) }}">Open →</a>
+                                <a href="{{ url_for('intake.admin_matter', matter_id=matter['id']) }}">Open →</a>
                             </td>
                         </tr>
                     {% endfor %}
